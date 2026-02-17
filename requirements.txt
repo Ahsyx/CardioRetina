@@ -1,0 +1,10 @@
+# Web Interface
+streamlit==1.31.1
+
+# Deep Learning Engine
+tensorflow-cpu==2.15.0  # Use tensorflow-cpu for smaller deployment size if no GPU is present
+Pillow==10.2.0
+numpy==1.26.4
+
+# Utilities
+h5py==3.10.0
