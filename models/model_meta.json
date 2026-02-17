@@ -1,0 +1,1 @@
+{"target_name": "Cardio_Risk", "diseases_included": ["HR", "BRVO", "CRVO", "BRAO", "CRAO", "DR"], "threshold": 0.5}
