@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useToast, ToastContainer } from './Toast'
+import { useToast, ToastContainer } from '../components/Toast'
 import { useNavigate } from 'react-router-dom'
 import { auth, db } from '../firebase'
 import { signOut } from 'firebase/auth'

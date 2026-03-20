@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { auth, db } from '../firebase'
 import { signInWithEmailAndPassword } from 'firebase/auth'
-import { useToast, ToastContainer } from './Toast'
+import { useToast, ToastContainer } from '../components/Toast'
 import { doc, getDoc } from 'firebase/firestore'
 
 function useAnimate(delay = 0) {
