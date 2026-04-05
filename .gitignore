@@ -17,5 +17,13 @@ __pycache__/
 backend/venv/
 *.h5
 
+# Logs and temporary files
+*.log
+error_log.txt
+logs/
+
+# Windows Zone.Identifier files
+*.Zone.Identifier
+
 # Misc
 .DS_Store
