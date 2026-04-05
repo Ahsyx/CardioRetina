@@ -16,11 +16,11 @@ export function useToast() {
   return { toasts, toast, dismiss }
 }
 
-export function ToastContainer({ toasts, dismiss, darkMode }) {
-  const accent  = darkMode ? '#d5ff5f' : '#bce236'
-  const bg      = darkMode ? '#111111' : '#ffffff'
-  const text    = darkMode ? '#ffffff' : '#111111'
-  const subtext = darkMode ? '#9ca3af' : '#6b7280'
+export function ToastContainer({ toasts, dismiss, darkMode, purpleMode }) {
+  const accent  = purpleMode ? '#ffe649' : darkMode ? '#d5ff5f' : '#bce236'
+  const bg      = purpleMode ? '#3a0a7a' : darkMode ? '#111111' : '#ffffff'
+  const text    = purpleMode ? '#ffffff' : darkMode ? '#ffffff' : '#111111'
+  const subtext = purpleMode ? '#c4a8f0' : darkMode ? '#9ca3af' : '#6b7280'
 
   const icons = {
     error:   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff4d4d" strokeWidth="2.5" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><circle cx="12" cy="16" r="0.5" fill="#ff4d4d"/></svg>,
