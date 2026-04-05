@@ -32,9 +32,19 @@ export function AuthProvider({ children }) {
     return unsubscribe
   }, [])
 
+  const refreshUserData = async () => {
+    if (!currentUser) return
+    const docRef = doc(db, 'users', currentUser.uid)
+    const docSnap = await getDoc(docRef)
+    if (docSnap.exists()) {
+      setUserData(docSnap.data())
+    }
+  }
+
   const value = {
     currentUser,
-    userData
+    userData,
+    refreshUserData
   }
 
   return (
