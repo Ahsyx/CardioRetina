@@ -3,7 +3,7 @@ import { useToast, ToastContainer } from '../components/Toast'
 import { useNavigate } from 'react-router-dom'
 import { auth, db } from '../firebase'
 import { signOut } from 'firebase/auth'
-import { collection, addDoc, getDocs, query, orderBy, where, doc, updateDoc } from 'firebase/firestore'
+import { collection, addDoc, getDocs, onSnapshot, query, orderBy, where, doc, updateDoc } from 'firebase/firestore'
 import { useAuth } from '../context/AuthContext'
 
 function useAnimate(delay = 0) {
@@ -55,11 +55,69 @@ function RiskGauge({ score, label, darkMode }) {
   )
 }
 
-function DoctorDashboard({ darkMode, setDarkMode }) {
+function DoctorDashboard({ darkMode, setDarkMode, purpleMode, setPurpleMode }) {
   const navigate = useNavigate()
   const { currentUser, userData } = useAuth()
 
   const [activeTab, setActiveTab] = useState('New Scan')
+
+  const toDatetimeLocal = (date) => {
+    const pad = (n) => String(n).padStart(2, '0')
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
+           `T${pad(date.getHours())}:${pad(date.getMinutes())}`
+  }
+
+  const parseDatetimeLocalString = (value) => {
+    if (!value) return null
+    const [datePart, timePart] = value.split('T')
+    if (!datePart || !timePart) return null
+    const [year, month, day] = datePart.split('-').map(Number)
+    const [hour, minute] = timePart.split(':').map(Number)
+    if ([year, month, day, hour, minute].some(v => Number.isNaN(v))) return null
+    return new Date(year, month - 1, day, hour, minute)
+  }
+
+  const getMinAppointmentTime = () => {
+    const pad = (n) => String(n).padStart(2, '0')
+    const d = new Date(Date.now() + 60000)
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
+           `T${pad(d.getHours())}:${pad(d.getMinutes())}`
+  }
+
+  const parseAppointmentTimeForInput = (value) => {
+    if (!value) return ''
+    const date = value?.toDate ? value.toDate() : new Date(value)
+    if (isNaN(date.getTime())) return ''
+    return toDatetimeLocal(date)
+  }
+
+  const formatAppointmentDate = (value) => {
+    if (!value) return '—'
+    const date = value?.toDate ? value.toDate() : new Date(value)
+    if (isNaN(date.getTime())) return '—'
+    return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+  }
+
+  const formatAppointmentTime = (value) => {
+    if (!value) return ''
+    const date = value?.toDate ? value.toDate() : new Date(value)
+    if (isNaN(date.getTime())) return ''
+    return date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+  }
+
+  const isPickedTimeValid = () => {
+    if (!pickedTime) return false
+
+    const date = parseDatetimeLocalString(pickedTime)
+    if (!date || isNaN(date.getTime())) return false
+
+    const now = new Date()
+
+    if (date <= now) return false
+    if (date.getTime() < now.getTime() + 60000) return false
+
+    return true
+  }
   const { toasts, toast, dismiss } = useToast()
   const [file, setFile] = useState(null)
   const [preview, setPreview] = useState(null)
@@ -78,13 +136,13 @@ function DoctorDashboard({ darkMode, setDarkMode }) {
   const [pickedTime, setPickedTime] = useState('')
   const [saving, setSaving] = useState(false)
 
-  const accent  = darkMode ? '#d5ff5f' : '#bce236'
-  const bg      = darkMode ? '#000000' : '#ffffff'
-  const card    = darkMode ? '#111111' : '#f5f5f5'
-  const card2   = darkMode ? '#1a1a1a' : '#eeeeee'
-  const text    = darkMode ? '#ffffff' : '#111111'
-  const subtext = darkMode ? '#9ca3af' : '#6b7280'
-  const border  = darkMode ? '#222222' : '#e5e5e5'
+  const accent  = purpleMode ? '#ffe649' : darkMode ? '#d5ff5f' : '#bce236'
+  const bg      = purpleMode ? '#470c98' : darkMode ? '#000000' : '#ffffff'
+  const card    = purpleMode ? '#3a0a7a' : darkMode ? '#111111' : '#f5f5f5'
+  const card2   = purpleMode ? '#2d0860' : darkMode ? '#1a1a1a' : '#eeeeee'
+  const text    = purpleMode ? '#ffffff' : darkMode ? '#ffffff' : '#111111'
+  const subtext = purpleMode ? '#c4a8f0' : darkMode ? '#9ca3af' : '#6b7280'
+  const border  = purpleMode ? '#6020c0' : darkMode ? '#222222' : '#e5e5e5'
 
   const navAnim     = useAnimate(0)
   const contentAnim = useAnimate(300)
@@ -92,8 +150,23 @@ function DoctorDashboard({ darkMode, setDarkMode }) {
 
   useEffect(() => {
     if (!currentUser) return
+
     fetchHistory()
-    fetchAppointments()
+
+    const q = query(
+      collection(db, 'appointments'),
+      where('doctorId', '==', currentUser.uid),
+      orderBy('createdAt', 'desc')
+    )
+
+    const unsubscribe = onSnapshot(q, (snap) => {
+      setAppointments(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+      setLoadingApts(false)
+    }, (err) => {
+      console.error('Error fetching appointments:', err)
+    })
+
+    return () => unsubscribe()
   }, [currentUser])
 
   const fetchHistory = async () => {
@@ -111,25 +184,9 @@ function DoctorDashboard({ darkMode, setDarkMode }) {
     }
   }
 
-  const fetchAppointments = async () => {
-    try {
-      const q = query(
-        collection(db, 'appointments'),
-        where('doctorId', '==', currentUser.uid),
-        orderBy('createdAt', 'desc')
-      )
-      const snap = await getDocs(q)
-      setAppointments(snap.docs.map(d => ({ id: d.id, ...d.data() })))
-    } catch (err) {
-      console.error('Error fetching appointments:', err)
-    } finally {
-      setLoadingApts(false)
-    }
-  }
-
   const rejectAppointment = async (aptId) => {
     try {
-      await updateDoc(doc(db, 'appointments', aptId), { status: 'rejected' })
+      await updateDoc(doc(db, 'appointments', aptId), { status: 'rejected', updatedAt: new Date() })
       setAppointments(prev => prev.map(a => a.id === aptId ? { ...a, status: 'rejected' } : a))
     } catch (err) {
       console.error('Error rejecting appointment:', err)
@@ -138,15 +195,35 @@ function DoctorDashboard({ darkMode, setDarkMode }) {
 
   const confirmAppointment = async (aptId) => {
     if (!pickedTime) return
+    const selectedDate = parseDatetimeLocalString(pickedTime)
+    if (!selectedDate || isNaN(selectedDate.getTime())) {
+      toast('Please select a valid appointment time.', 'error')
+      return
+    }
+
+    const now = new Date()
+
+    if (!selectedDate || selectedDate <= now) {
+      toast('Invalid or past time. Pick again.', 'error')
+      setPickedTime(getMinAppointmentTime())
+      return
+    }
+
+    if (selectedDate.getTime() < now.getTime() + 60000) {
+      toast('Select at least 1 min in future.', 'error')
+      setPickedTime(getMinAppointmentTime())
+      return
+    }
+
     setSaving(true)
     try {
       await updateDoc(doc(db, 'appointments', aptId), {
-        appointmentTime: new Date(pickedTime).toISOString(),
+        appointmentTime: selectedDate,
         status: 'scheduled',
+        updatedAt: new Date(),
       })
       setScheduling(null)
       setPickedTime('')
-      await fetchAppointments()
     } catch (err) {
       toast('Error: ' + err.message, 'error')
     } finally {
@@ -156,7 +233,6 @@ function DoctorDashboard({ darkMode, setDarkMode }) {
 
   const markDone = async (aptId) => {
     await updateDoc(doc(db, 'appointments', aptId), { status: 'done' })
-    await fetchAppointments()
   }
 
   const handleLogout = async () => {
@@ -224,14 +300,15 @@ function DoctorDashboard({ darkMode, setDarkMode }) {
         console.error('Error saving scan:', err)
       }
 
-      setResults({
-        risk_score: data.risk_score,
-        label: data.label,
-        confidence: data.confidence,
-        conditions: data.conditions,
-        recommendation: data.recommendation,
-        gradcam: data.gradcam
-      })
+     setResults({
+  risk_score:     data.risk_score,
+  label:          data.label,
+  confidence:     data.confidence,
+  conditions:     data.conditions,
+  recommendation: data.recommendation,
+  gradcam:        data.gradcam,
+  image_b64:      data.image_b64 || null,  // ← add this
+})
 
     } catch (err) {
       console.error('Failed to connect to backend:', err)
@@ -363,34 +440,21 @@ function DoctorDashboard({ darkMode, setDarkMode }) {
           <div style={{ fontSize: '0.85rem', color: subtext }}>
             {userData?.name || currentUser?.email || 'Dr. User'}
           </div>
-          <button
-            onClick={() => setDarkMode(!darkMode)}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0.3rem', display: 'flex', alignItems: 'center', opacity: 0.7, transition: 'opacity 0.2s' }}
+          <button onClick={() => setPurpleMode(p => !p)} title="Toggle violet theme"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0.3rem', opacity: purpleMode ? 1 : 0.5, fontSize: '1rem', transition: 'opacity 0.2s' }}
             onMouseEnter={e => e.currentTarget.style.opacity = 1}
-            onMouseLeave={e => e.currentTarget.style.opacity = 0.7}
-          >
-            {darkMode ? (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={text} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="5"/>
-                <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
-                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
-                <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
-                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
-              </svg>
-            ) : (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={text} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
-              </svg>
-            )}
-          </button>
-          <button onClick={handleLogout} style={{
-            padding: '0.5rem 1.2rem', borderRadius: '999px',
-            backgroundColor: 'transparent', color: '#ff4d4d',
-            border: '1px solid #ff4d4d33', cursor: 'pointer',
-            fontSize: '0.85rem', fontFamily: 'inherit', fontWeight: '500'
-          }}>
-            Sign Out
-          </button>
+            onMouseLeave={e => e.currentTarget.style.opacity = purpleMode ? 1 : 0.5}>✦</button>
+          {!purpleMode && (
+            <button onClick={() => setDarkMode(!darkMode)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0.3rem', display: 'flex', alignItems: 'center', opacity: 0.7, transition: 'opacity 0.2s' }}
+              onMouseEnter={e => e.currentTarget.style.opacity = 1}
+              onMouseLeave={e => e.currentTarget.style.opacity = 0.7}>
+              {darkMode
+                ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={text} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+                : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={text} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>}
+            </button>
+          )}
+          <button onClick={handleLogout} style={{ padding: '0.5rem 1.2rem', borderRadius: '999px', backgroundColor: 'transparent', color: '#ff4d4d', border: '1px solid #ff4d4d33', cursor: 'pointer', fontSize: '0.85rem', fontFamily: 'inherit', fontWeight: '500' }}>Sign Out</button>
         </div>
       </nav>
 
@@ -601,10 +665,10 @@ function DoctorDashboard({ darkMode, setDarkMode }) {
                           <div style={{ textAlign: 'right' }}>
                             <p style={{ margin: '0 0 0.2rem', fontSize: '0.75rem', color: subtext, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Appointment</p>
                             <p style={{ margin: 0, fontSize: '1.1rem', fontWeight: '700', color: accent, fontFamily: 'Junicode, serif' }}>
-                              {new Date(apt.appointmentTime).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                              {formatAppointmentDate(apt.appointmentTime)}
                             </p>
                             <p style={{ margin: 0, fontSize: '0.85rem', color: subtext }}>
-                              {new Date(apt.appointmentTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                              {formatAppointmentTime(apt.appointmentTime)}
                             </p>
                           </div>
                         )}
@@ -628,7 +692,7 @@ function DoctorDashboard({ darkMode, setDarkMode }) {
                       <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
                         {apt.status === 'pending' && (
                           <>
-                            <button onClick={() => { setScheduling(apt.id); setPickedTime('') }}
+                            <button onClick={() => { setScheduling(apt.id); setPickedTime(getMinAppointmentTime()) }}
                               style={{ padding: '0.65rem 1.6rem', borderRadius: '999px', backgroundColor: accent, color: '#000', fontWeight: '600', border: 'none', cursor: 'pointer', fontSize: '0.9rem', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: '0.45rem', transition: 'opacity 0.2s' }}>
                               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                                 <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
@@ -646,7 +710,7 @@ function DoctorDashboard({ darkMode, setDarkMode }) {
                         )}
                         {apt.status === 'scheduled' && (
                           <>
-                            <button onClick={() => { setScheduling(apt.id); setPickedTime(apt.appointmentTime ? apt.appointmentTime.slice(0, 16) : '') }}
+                            <button onClick={() => { setScheduling(apt.id); setPickedTime(getMinAppointmentTime()) }}
                               style={{ padding: '0.65rem 1.6rem', borderRadius: '999px', backgroundColor: 'transparent', color: accent, fontWeight: '600', border: `1px solid ${accent}`, cursor: 'pointer', fontSize: '0.9rem', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
                               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
@@ -675,20 +739,22 @@ function DoctorDashboard({ darkMode, setDarkMode }) {
                           </span>
                         )}
 
-                        {/* View Report toggle */}
-                        <button onClick={() => {
-                          const next = expandedApt === apt.id ? null : apt.id
-                          setExpandedApt(next)
-                          console.log('scanResult:', apt.scanResult)
-                          console.log('imageUrl:', apt.scanResult?.imageUrl)
-                          console.log('gradcam length:', apt.scanResult?.gradcam?.length)
-                        }}
-                          style={{ padding: '0.65rem 1.6rem', borderRadius: '999px', backgroundColor: expandedApt === apt.id ? `${accent}22` : 'transparent', color: expandedApt === apt.id ? accent : subtext, fontWeight: '500', border: `1px solid ${expandedApt === apt.id ? accent : border}`, cursor: 'pointer', fontSize: '0.9rem', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: '0.45rem', marginLeft: 'auto', transition: 'all 0.2s' }}>
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
-                          </svg>
-                          {expandedApt === apt.id ? 'Hide Report' : 'View Report'}
-                        </button>
+                        {/* View Report toggle — only show if scan exists */}
+                        {apt.scanResult && (
+                          <button onClick={() => {
+                            const next = expandedApt === apt.id ? null : apt.id
+                            setExpandedApt(next)
+                            console.log('scanResult:', apt.scanResult)
+                            console.log('imageUrl:', apt.scanResult?.imageUrl)
+                            console.log('gradcam length:', apt.scanResult?.gradcam?.length)
+                          }}
+                            style={{ padding: '0.65rem 1.6rem', borderRadius: '999px', backgroundColor: expandedApt === apt.id ? `${accent}22` : 'transparent', color: expandedApt === apt.id ? accent : subtext, fontWeight: '500', border: `1px solid ${expandedApt === apt.id ? accent : border}`, cursor: 'pointer', fontSize: '0.9rem', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: '0.45rem', marginLeft: 'auto', transition: 'all 0.2s' }}>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+                            </svg>
+                            {expandedApt === apt.id ? 'Hide Report' : 'View Report'}
+                          </button>
+                        )}
                       </div>
 
                       {/* Expanded scan report */}
@@ -814,7 +880,7 @@ function DoctorDashboard({ darkMode, setDarkMode }) {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                   {[
                     { label: 'Role',         value: 'Doctor' },
-                    { label: 'Specialty',    value: userData?.specialty || '—' },
+                    { label: 'Date of Birth', value: userData?.dob ? new Date(userData.dob).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : 'Not provided' },
                     { label: 'Member Since', value: currentUser?.metadata?.creationTime ? new Date(currentUser.metadata.creationTime).getFullYear() : '2026' },
                     { label: 'Total Scans',  value: String(scanHistory.length) },
                     { label: 'Patients',     value: String(appointments.length) },
@@ -865,14 +931,21 @@ function DoctorDashboard({ darkMode, setDarkMode }) {
             <input
               type="datetime-local"
               value={pickedTime}
-              min={new Date().toISOString().slice(0, 16)}
-              onChange={e => setPickedTime(e.target.value)}
+              min={getMinAppointmentTime()}
+              onChange={e => {
+                const value = e.target.value
+                const date = parseDatetimeLocalString(value)
+                if (!date || date <= new Date()) {
+                  return
+                }
+                setPickedTime(value)
+              }}
               style={{ width: '100%', backgroundColor: darkMode ? '#1a1a1a' : '#f5f5f5', border: `1px solid ${border}`, color: text, borderRadius: '12px', padding: '0.9rem 1rem', fontSize: '1rem', boxSizing: 'border-box', marginBottom: '1.2rem', fontFamily: 'inherit', outline: 'none' }}
             />
 
             <div style={{ display: 'flex', gap: '0.75rem' }}>
-              <button onClick={() => confirmAppointment(scheduling)} disabled={!pickedTime || saving}
-                style={{ flex: 1, padding: '0.8rem', borderRadius: '999px', backgroundColor: !pickedTime || saving ? card2 : accent, color: '#000', fontWeight: '600', border: 'none', cursor: !pickedTime || saving ? 'not-allowed' : 'pointer', fontSize: '0.95rem', fontFamily: 'inherit', opacity: saving ? 0.7 : 1, transition: 'all 0.2s' }}>
+              <button onClick={() => confirmAppointment(scheduling)} disabled={!pickedTime || !isPickedTimeValid() || saving}
+                style={{ flex: 1, padding: '0.8rem', borderRadius: '999px', backgroundColor: !pickedTime || !isPickedTimeValid() || saving ? card2 : accent, color: '#000', fontWeight: '600', border: 'none', cursor: !pickedTime || !isPickedTimeValid() || saving ? 'not-allowed' : 'pointer', fontSize: '0.95rem', fontFamily: 'inherit', opacity: saving ? 0.7 : 1, transition: 'all 0.2s' }}>
                 {saving ? 'Saving...' : 'Confirm Appointment'}
               </button>
               <button onClick={() => setScheduling(null)}
@@ -890,7 +963,7 @@ function DoctorDashboard({ darkMode, setDarkMode }) {
           to { transform: rotate(360deg); }
         }
       `}</style>
-      <ToastContainer toasts={toasts} dismiss={dismiss} darkMode={darkMode} />
+      <ToastContainer toasts={toasts} dismiss={dismiss} darkMode={darkMode} purpleMode={purpleMode} />
     </div>
   )
 }
