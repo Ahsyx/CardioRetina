@@ -19,23 +19,26 @@ function ProtectedRoute({ children, requiredRole }) {
 }
 
 function App() {
-  const [darkMode, setDarkMode] = useState(true)
+  const [darkMode, setDarkMode]     = useState(true)
+  const [purpleMode, setPurpleMode] = useState(false)
+
+  const themeProps = { darkMode, setDarkMode, purpleMode, setPurpleMode }
 
   return (
     <Routes>
-      <Route path="/" element={<Landing darkMode={darkMode} setDarkMode={setDarkMode} />} />
-      <Route path="/signup" element={<Signup darkMode={darkMode} setDarkMode={setDarkMode} />} />
-      <Route path="/login" element={<Login darkMode={darkMode} setDarkMode={setDarkMode} />} />
+      <Route path="/"       element={<Landing          {...themeProps} />} />
+      <Route path="/signup" element={<Signup           {...themeProps} />} />
+      <Route path="/login"  element={<Login            {...themeProps} />} />
 
       <Route path="/dashboard/doctor" element={
         <ProtectedRoute requiredRole="doctor">
-          <DoctorDashboard darkMode={darkMode} setDarkMode={setDarkMode} />
+          <DoctorDashboard {...themeProps} />
         </ProtectedRoute>
       } />
 
       <Route path="/dashboard/patient" element={
         <ProtectedRoute requiredRole="patient">
-          <PatientDashboard darkMode={darkMode} setDarkMode={setDarkMode} />
+          <PatientDashboard {...themeProps} />
         </ProtectedRoute>
       } />
 
