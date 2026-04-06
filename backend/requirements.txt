@@ -3,7 +3,7 @@ uvicorn[standard]
 tensorflow==2.19.0
 keras==3.13.2
 pillow
-opencv-python
+opencv-python-headless
 numpy
 scikit-learn
 python-multipart
