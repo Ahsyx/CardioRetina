@@ -131,14 +131,14 @@ function Landing({ darkMode, setDarkMode, purpleMode, setPurpleMode }) {
     { name: 'scikit-learn', slug: 'scikitlearn' }, { name: 'NumPy', slug: 'numpy' },
   ]
 
-  const stats = [
-    { value: '88%',   label: 'Model Accuracy',     sub: 'On RFMiD test set' },
-    { value: '0.91',  label: 'AUC-ROC Score',       sub: 'Area under curve' },
-    { value: '1,920', label: 'Training Images',      sub: 'Fundus photographs' },
-    { value: '88%',   label: 'High Risk Recall',     sub: 'Sensitivity score' },
-    { value: '0.20',  label: 'Risk Threshold',       sub: 'Tuned for recall' },
-    { value: '6',     label: 'Biomarkers Detected',  sub: 'HR, DR, BRVO, CRVO+' },
-  ]
+ const stats = [
+  { value: '96.4%', label: 'Model AUC',          sub: 'On RFMiD test set' },
+  { value: '0.9642',label: 'AUC-ROC Score',       sub: 'Area under curve' },
+  { value: '2,560', label: 'Training Images',      sub: 'Fundus photographs' },
+  { value: '91%',   label: 'High Risk Recall',     sub: 'Sensitivity score' },
+  { value: '0.20',  label: 'Risk Threshold',       sub: 'Tuned for recall' },
+  { value: '6',     label: 'Biomarkers Detected',  sub: 'HR, DR, BRVO, CRVO+' },
+]
 
   const steps = [
     {
