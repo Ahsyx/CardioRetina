@@ -642,7 +642,6 @@ Upload retinal image file.
 
 # 📷 Screenshots
 
-> Add screenshots after uploading images to GitHub.
 
 ## 🏠 Landing Page
 
