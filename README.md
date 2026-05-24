@@ -646,41 +646,33 @@ Upload retinal image file.
 
 ## 🏠 Landing Page
 
-```text
-Add Landing Page Screenshot Here
-```
+
+![Landing Page](./images/Landingpage.png)
+
 
 ---
 
 ## 🔐 Login Page
 
-```text
-Add Login Screenshot Here
-```
+![Login Page](./images/Login.png)
 
 ---
 
 ## 👤 Patient Dashboard
 
-```text
-Add Patient Dashboard Screenshot Here
-```
+![Patient Dashboard](./images/patient-Dashboard.png)
 
 ---
 
 ## 👨‍⚕️ Doctor Dashboard
 
-```text
-Add Doctor Dashboard Screenshot Here
-```
+![Doctor Dashboard](./images/Doctor-Dashboard.png)
 
 ---
 
 ## 📊 Prediction Result
 
-```text
-Add Prediction Screenshot Here
-```
+![Prediction Result](./images/prediction.png)
 
 ---
 
